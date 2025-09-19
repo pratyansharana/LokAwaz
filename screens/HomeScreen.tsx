@@ -28,7 +28,11 @@ import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import dayjs from "dayjs";
 import Swiper from "react-native-swiper";
-import messaging from "@react-native-firebase/messaging";
+
+// ✅ Expo push notification imports
+import * as Notifications from "expo-notifications";
+import * as Device from "expo-device";
+import Constants from "expo-constants";
 
 const { width } = Dimensions.get("window");
 
@@ -55,44 +59,55 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // ---------------- FCM TOKEN ----------------
-  const saveFcmTokenToFirestore = async () => {
+  // ---------------- Expo Push Token ----------------
+  const saveExpoPushTokenToFirestore = async () => {
     try {
-      console.log("Starting FCM token upload process...");
+      console.log("Starting Expo push token upload process...");
 
-      // Request permissions
-      const authStatus = await messaging().requestPermission();
-      const enabled =
-        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+      if (!Device.isDevice) {
+        console.log("Must use physical device for Push Notifications");
+        return;
+      }
 
-      if (!enabled) {
+      // Ask for permission
+      const { status: existingStatus } = await Notifications.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== "granted") {
+        const { status } = await Notifications.requestPermissionsAsync();
+        finalStatus = status;
+      }
+
+      if (finalStatus !== "granted") {
         console.log("Push notification permission denied");
         return;
       }
 
-      // Get the FCM token
-      const fcmToken = await messaging().getToken();
-      console.log("Fetched FCM token:", fcmToken);
+      // Get Expo Push Token
+      const tokenData = await Notifications.getExpoPushTokenAsync({
+        projectId: Constants.expoConfig?.extra?.eas?.projectId,
+      });
+
+      const expoPushToken = tokenData.data;
+      console.log("Expo push token:", expoPushToken);
 
       if (auth.currentUser) {
         await setDoc(
           doc(db, "users", auth.currentUser.uid),
-          { fcmToken },
+          { expoPushToken },
           { merge: true }
         );
-        console.log("FCM token uploaded successfully to Firestore");
+        console.log("Expo push token uploaded to Firestore");
       } else {
-        console.log("No logged-in user to save FCM token");
+        console.log("No logged-in user to save token");
       }
-    } catch (err: any) {
-      console.error("Error uploading FCM token:", err);
+    } catch (err) {
+      console.error("Error uploading Expo push token:", err);
     }
   };
 
   // ---------------- FIRESTORE LISTENER ----------------
   useEffect(() => {
-    saveFcmTokenToFirestore();
+    saveExpoPushTokenToFirestore();
 
     const issuesQuery = query(
       collection(db, "issues"),
