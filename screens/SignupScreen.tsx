@@ -2,27 +2,24 @@ import React, { useState } from 'react';
 import { 
   View, 
   TextInput, 
-  Button, 
   StyleSheet, 
   Text, 
   TouchableOpacity,
-  Alert // Make sure Alert is imported
+  Alert 
 } from 'react-native';
-// Import both createUser and signOut from firebase/auth
-import { createUserWithEmailAndPassword, sendEmailVerification, signOut } from 'firebase/auth';
-
+import { 
+  createUserWithEmailAndPassword, 
+  sendEmailVerification, 
+  signOut 
+} from 'firebase/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { auth } from '../Firebase/firebaseconfig';
 
-// Import your Firebase auth instance
-import { auth } from '../Firebase/firebaseconfig'; // Ensure this path is correct
-
-// Define the types for your authentication stack's parameters
 type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
 };
 
-// Define the type for the screen's props
 type SignupScreenProps = NativeStackScreenProps<AuthStackParamList, 'Signup'>;
 
 const SignupScreen = ({ navigation }: SignupScreenProps) => {
@@ -31,33 +28,53 @@ const SignupScreen = ({ navigation }: SignupScreenProps) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-const handleSignUp = async () => {
-  setError(null);
+  const handleSignUp = async () => {
+    setError(null);
 
-  // ... (validation code remains the same)
+    // Local validation
+    if (!email || !password || !confirmPassword) {
+      setError("All fields are required.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 6) {
+      setError("Password must be at least 6 characters long.");
+      return;
+    }
 
-  try {
-    // 1. Create the user account
-    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-    const user = userCredential.user;
+    try {
+      // 1. Create account
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
 
-    // 2. NEW: Send the verification email to the newly created user
-    await sendEmailVerification(user);
+      // 2. Send verification email
+      await sendEmailVerification(user);
 
-    // 3. Sign the user out
-    await signOut(auth);
+      // 3. Sign out immediately
+      await signOut(auth);
 
-    // 4. Inform the user to check their email
-    Alert.alert(
-      "Account Created!",
-      "We've sent a verification link to your email address. Please verify your email before logging in.",
-      [{ text: "OK", onPress: () => navigation.navigate('Login') }]
-    );
+      // 4. Notify user
+      Alert.alert(
+        "Account Created!",
+        "We've sent a verification link to your email. Please verify before logging in.",
+        [{ text: "OK", onPress: () => navigation.navigate('Login') }]
+      );
 
-  } catch (err: any) {
-    // ... (error handling remains the same)
-  }
-};
+    } catch (err: any) {
+      let message = "Signup failed. Please try again.";
+      if (err.code === "auth/email-already-in-use") {
+        message = "This email is already registered.";
+      } else if (err.code === "auth/invalid-email") {
+        message = "Please enter a valid email address.";
+      } else if (err.code === "auth/weak-password") {
+        message = "Password is too weak.";
+      }
+      setError(message);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -79,6 +96,7 @@ const handleSignUp = async () => {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        autoCapitalize="none"
         placeholderTextColor="#888"
       />
       
@@ -88,14 +106,15 @@ const handleSignUp = async () => {
         value={confirmPassword}
         onChangeText={setConfirmPassword}
         secureTextEntry
+        autoCapitalize="none"
         placeholderTextColor="#888"
       />
 
       {error && <Text style={styles.errorText}>{error}</Text>}
       
-      <View style={styles.buttonContainer}>
-        <Button title="Sign Up" onPress={handleSignUp} />
-      </View>
+      <TouchableOpacity style={styles.button} onPress={handleSignUp}>
+        <Text style={styles.buttonText}>Sign Up</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Login')}>
         <Text style={styles.loginText}>Already have an account? Login</Text>
@@ -129,11 +148,17 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333'
   },
-  buttonContainer: {
-    marginVertical: 10,
+  button: {
     backgroundColor: '#007AFF',
     borderRadius: 8,
-    paddingVertical: 5,
+    paddingVertical: 14,
+    marginTop: 10,
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
   },
   errorText: { 
     color: '#D8000C', 

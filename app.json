@@ -17,7 +17,6 @@
       "supportsTablet": true
     },
     "android": {
-
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCifJyz7P8-up7zmUHqSmS9glWmzD49rrc"
@@ -25,13 +24,15 @@
       },
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff",
-        
+        "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-audio"
+    ]
   }
 }

@@ -1,29 +1,43 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
+import React, { useState, useEffect, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
   FlatList,
   SafeAreaView,
-  ScrollView,
-  Image
-} from 'react-native';
-import { signOut } from 'firebase/auth';
-import { collection, onSnapshot, QuerySnapshot, DocumentData, query, limit } from 'firebase/firestore';
-import { auth, db } from '../Firebase/firebaseconfig';
-import MapView, { Marker, Region } from 'react-native-maps';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+  Image,
+  ActivityIndicator,
+  RefreshControl,
+  Dimensions,
+} from "react-native";
+import { signOut } from "firebase/auth";
+import {
+  collection,
+  onSnapshot,
+  query,
+  orderBy,
+  limit,
+  DocumentData,
+} from "firebase/firestore";
+import { auth, db } from "../Firebase/firebaseconfig";
+import Icon from "react-native-vector-icons/MaterialCommunityIcons";
+import type { NativeStackScreenProps } from "@react-navigation/native-stack";
+import dayjs from "dayjs";
+import Swiper from "react-native-swiper";
 
-// --- MOCK DATA AND TYPES (Replace with your actual data fetching) ---
+const { width } = Dimensions.get("window");
+
 interface Issue {
   id: string;
-  title: string;
-  category: string;
+  description: string;
+  images: string[];
+  status: string;
+  createdAt: {
+    seconds: number;
+  };
   location: { latitude: number; longitude: number };
-  status: 'Reported' | 'In Progress' | 'Resolved';
-  imageUrl: string;
+  userId: string;
 }
 
 type AppStackParamList = {
@@ -32,183 +46,249 @@ type AppStackParamList = {
   ReportIssue: { category: string };
 };
 
-type HomeScreenProps = NativeStackScreenProps<AppStackParamList, 'Home'>;
-
-const CATEGORIES = [
-  { id: '1', title: 'Potholes', icon: 'road-variant', color: '#e74c3c' },
-  { id: '2', title: 'Garbage', icon: 'trash-can-outline', color: '#27ae60' },
-  { id: '3', title: 'Streetlight', icon: 'lightbulb-on-outline', color: '#f1c40f' },
-  { id: '4', title: 'Water Leak', icon: 'water-pump', color: '#3498db' },
-  { id: '5', title: 'Other', icon: 'alert-circle-outline', color: '#7f8c8d' },
-];
-// --- END MOCK DATA ---
+type HomeScreenProps = NativeStackScreenProps<AppStackParamList, "Home">;
 
 const HomeScreen = ({ navigation }: HomeScreenProps) => {
-  const [recentIssues, setRecentIssues] = useState<Issue[]>([]);
-  const [region, setRegion] = useState<Region>({
-    latitude: 22.7196,
-    longitude: 75.8577,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
+  const [issues, setIssues] = useState<Issue[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
-    // Fetch the 3 most recent issues
-    const issuesQuery = query(collection(db, 'issues'), limit(3));
-    const unsubscribe = onSnapshot(issuesQuery, (snapshot: QuerySnapshot<DocumentData>) => {
-      const fetchedIssues = snapshot.docs.map(doc => ({
-        id: doc.id, ...doc.data()
-      })) as Issue[];
-      setRecentIssues(fetchedIssues);
+    const issuesQuery = query(
+      collection(db, "issues"),
+      orderBy("createdAt", "desc"),
+      limit(10)
+    );
+
+    const unsubscribe = onSnapshot(issuesQuery, (snapshot) => {
+      const fetchedIssues = snapshot.docs.map((doc) => {
+        const data = doc.data() as DocumentData;
+        return {
+          id: doc.id,
+          description: data.description || "",
+          images: data.images || [],
+          status: data.status || "Reported",
+          createdAt: data.createdAt || { seconds: 0 },
+          location: data.location || { latitude: 0, longitude: 0 },
+          userId: data.userId || "",
+        } as Issue;
+      });
+      setIssues(fetchedIssues);
+      setLoading(false);
+      setRefreshing(false);
     });
+
     return () => unsubscribe();
   }, []);
 
-  const renderCategoryItem = ({ item }: { item: typeof CATEGORIES[0] }) => (
-    <TouchableOpacity 
-      style={styles.categoryCard}
-      onPress={() => navigation.navigate('ReportIssue', { category: item.title })}>
-      <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
-        <Icon name={item.icon} size={24} color={item.color} />
-      </View>
-      <Text style={styles.categoryTitle}>{item.title}</Text>
-    </TouchableOpacity>
-  );
+  const handleSignOut = async () => {
+    try {
+      await signOut(auth);
+      alert("Signed out successfully");
+    } catch (err) {
+      alert("Error signing out");
+    }
+  };
 
-  const renderIssueCard = (item: Issue) => (
-    <TouchableOpacity key={item.id} style={styles.issueCard}>
-      <Image source={{ uri: item.imageUrl || 'https://via.placeholder.com/100' }} style={styles.issueCardImage} />
-      <View style={styles.issueCardContent}>
-        <Text style={styles.issueCardTitle} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.issueCardCategory}>{item.category}</Text>
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+  }, []);
+
+  const renderImages = (images: string[]) => {
+    if (images.length === 0) return null;
+
+    return (
+      <View style={styles.imageContainer}>
+        {images.length === 1 ? (
+          <Image source={{ uri: images[0] }} style={styles.issueImage} />
+        ) : (
+          <Swiper
+            style={styles.swiper}
+            showsPagination={true}
+            height={250}
+            activeDotColor="#007AFF"
+          >
+            {images.map((img, index) => (
+              <Image key={index} source={{ uri: img }} style={styles.issueImage} />
+            ))}
+          </Swiper>
+        )}
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
+
+  const renderIssueCard = ({ item }: { item: Issue }) => {
+    const formattedDate = dayjs
+      .unix(item.createdAt.seconds)
+      .format("MMM D, YYYY h:mm A");
+
+    return (
+      <View style={styles.issueCard}>
+        {/* Header */}
+        <View style={styles.issueCardHeader}>
+          <Icon name="account-circle" size={40} color="#555" />
+          <View style={{ flex: 1, marginLeft: 10 }}>
+            <Text style={styles.issueUser}>{item.userId || "Anonymous"}</Text>
+            <Text style={styles.issueDate}>{formattedDate}</Text>
+          </View>
+          <View
+            style={[
+              styles.statusBadge,
+              statusColors[item.status] || statusColors["Reported"],
+            ]}
+          >
+            <Text style={styles.statusBadgeText}>{item.status}</Text>
+          </View>
+        </View>
+
+        {/* Images */}
+        {renderImages(item.images)}
+
+        {/* Description */}
+        {item.description ? (
+          <Text style={styles.issueDescription}>{item.description}</Text>
+        ) : null}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>LokAwaz</Text>
-          <TouchableOpacity onPress={() => signOut(auth)}>
-            <Icon name="account-circle-outline" size={30} color="#333" />
-          </TouchableOpacity>
-        </View>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>LokAwaz</Text>
+        <TouchableOpacity onPress={handleSignOut} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+          <Icon name="logout" size={28} color="#fff" />
+        </TouchableOpacity>
+      </View>
 
-        {/* Quick Report Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Report an Issue</Text>
-          <FlatList
-            data={CATEGORIES}
-            renderItem={renderCategoryItem}
-            keyExtractor={item => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingLeft: 20 }}
-          />
-        </View>
-        
-        {/* Nearby Issues Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Nearby Issues</Text>
-          <View style={styles.mapContainer}>
-            <MapView
-              style={styles.map}
-              initialRegion={region}
-              scrollEnabled={false}
-              zoomEnabled={false}
-              pitchEnabled={false}
-              rotateEnabled={false}
-            >
-              {recentIssues.map(issue => (
-                <Marker key={issue.id} coordinate={issue.location} />
-              ))}
-            </MapView>
-          </View>
-          {recentIssues.map(renderIssueCard)}
-          
-          <TouchableOpacity 
-            style={styles.viewAllButton}
-            onPress={() => navigation.navigate('FullMap')}>
-            <Text style={styles.viewAllButtonText}>View All on Full Map</Text>
-            <Icon name="arrow-right" size={16} color="#FFF" />
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
+      {/* Feed */}
+      {loading ? (
+        <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 50 }} />
+      ) : issues.length === 0 ? (
+        <Text style={styles.noIssuesText}>No issues reported yet.</Text>
+      ) : (
+        <FlatList
+          data={issues}
+          renderItem={renderIssueCard}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 100 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+        />
+      )}
+
+      {/* Floating Action Button */}
+      <TouchableOpacity
+        style={styles.fab}
+        onPress={() => navigation.navigate("ReportIssue", { category: "General" })}
+      >
+        <Icon name="plus" size={28} color="#fff" />
+      </TouchableOpacity>
     </SafeAreaView>
   );
 };
 
+const statusColors: Record<string, any> = {
+  Reported: { backgroundColor: "#e74c3c" },
+  "In Progress": { backgroundColor: "#f1c40f" },
+  Resolved: { backgroundColor: "#27ae60" },
+};
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  container: {
+    flex: 1,
+    backgroundColor: "#f2f4f7",
+  },
   header: {
-    paddingHorizontal: 20,
     paddingVertical: 15,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    paddingHorizontal: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: "#007AFF",
+    elevation: 4,
   },
-  headerTitle: { fontSize: 24, fontWeight: 'bold' },
-  section: { marginBottom: 20 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: '#333', marginBottom: 15, paddingHorizontal: 20 },
-  categoryCard: {
-    width: 100,
-    height: 100,
-    backgroundColor: '#f5f5f5',
-    borderRadius: 12,
-    marginRight: 15,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 10,
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#fff",
+    letterSpacing: 1,
   },
-  categoryIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  categoryTitle: { fontSize: 12, fontWeight: '500', textAlign: 'center' },
-  mapContainer: {
-    height: 200,
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginHorizontal: 20,
-    marginBottom: 10,
-  },
-  map: { flex: 1 },
-  issueCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginBottom: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#eee',
-  },
-  issueCardImage: { width: 50, height: 50, borderRadius: 8 },
-  issueCardContent: { flex: 1, marginLeft: 15 },
-  issueCardTitle: { fontSize: 16, fontWeight: '600' },
-  issueCardCategory: { fontSize: 14, color: '#888' },
-  viewAllButton: {
-    backgroundColor: '#333',
-    padding: 15,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginHorizontal: 20,
-    marginTop: 10,
-    flexDirection: 'row',
-  },
-  viewAllButtonText: {
-    color: '#FFF',
+  noIssuesText: {
+    textAlign: "center",
+    marginTop: 30,
     fontSize: 16,
-    fontWeight: 'bold',
-    marginRight: 8,
+    color: "#888",
+  },
+  issueCard: {
+    marginTop: 15,
+    marginHorizontal: 15,
+    backgroundColor: "#fff",
+    borderRadius: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  issueCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+  },
+  issueUser: {
+    fontWeight: "600",
+    fontSize: 16,
+    color: "#333",
+  },
+  issueDate: {
+    fontSize: 12,
+    color: "#999",
+    marginTop: 2,
+  },
+  statusBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 16,
+    alignSelf: "center",
+    justifyContent: "center",
+  },
+  statusBadgeText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 12,
+  },
+  imageContainer: {
+    width: "100%",
+    height: 250,
+  },
+  swiper: {},
+  issueImage: {
+    width: "100%",
+    height: 250,
+    resizeMode: "cover",
+  },
+  issueDescription: {
+    paddingHorizontal: 15,
+    paddingVertical: 14,
+    fontSize: 15,
+    lineHeight: 22,
+    color: "#444",
+  },
+  fab: {
+    position: "absolute",
+    bottom: 25,
+    right: 25,
+    backgroundColor: "#007AFF",
+    borderRadius: 30,
+    width: 60,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 5,
   },
 });
 

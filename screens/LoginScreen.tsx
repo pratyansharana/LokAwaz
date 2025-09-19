@@ -2,17 +2,20 @@ import React, { useState } from 'react';
 import { 
   View, 
   TextInput, 
-  Button, 
   StyleSheet, 
   Text, 
   Alert, 
-  TouchableOpacity 
+  TouchableOpacity,
+  ActivityIndicator
 } from 'react-native';
-import { signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { 
+  signInWithEmailAndPassword, 
+  signOut, 
+  sendEmailVerification 
+} from 'firebase/auth';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { auth } from '../Firebase/firebaseconfig'; // Ensure this path is correct
+import { auth } from '../Firebase/firebaseconfig';
 
-// Define types for your navigator's screens
 type AuthStackParamList = {
   Login: undefined;
   Signup: undefined;
@@ -24,37 +27,55 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false); // <-- loading state
 
   const handleLogin = async () => {
-    if (email === '' || password === '') {
+    if (!email || !password) {
       setError('Please enter both email and password.');
       return;
     }
 
+    setLoading(true); // <-- show loading
     try {
       setError(null);
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Check for email verification
+
       if (userCredential.user.emailVerified) {
-        // User is verified, onAuthStateChanged will navigate to HomeScreen
+        // onAuthStateChanged will take care of navigation
       } else {
-        // User is not verified, show an alert and sign them out
         Alert.alert(
           "Verify Your Email",
-          "You must verify your email address before logging in. Please check your inbox.",
-          [{ text: "OK" }]
+          "You must verify your email before logging in.",
+          [
+            { text: "Resend Link", onPress: async () => {
+              try {
+                await sendEmailVerification(userCredential.user);
+                Alert.alert("Verification Sent", "Please check your inbox.");
+              } catch (err) {
+                Alert.alert("Error", "Could not resend verification email.");
+              }
+            }},
+            { text: "OK" }
+          ]
         );
-        await signOut(auth); // Sign out the unverified user
+        await signOut(auth);
       }
 
     } catch (err: any) {
-      if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password' || err.code === 'auth/invalid-credential') {
-        setError('Invalid email or password. Please try again.');
-      } else {
-        setError('An error occurred during login.');
+      let message = 'An error occurred during login.';
+      if (err.code === 'auth/user-not-found') {
+        message = 'No account found with this email.';
+      } else if (err.code === 'auth/wrong-password') {
+        message = 'Incorrect password. Try again.';
+      } else if (err.code === 'auth/invalid-email') {
+        message = 'Invalid email address.';
+      } else if (err.code === 'auth/too-many-requests') {
+        message = 'Too many failed attempts. Please try again later.';
       }
+      setError(message);
       console.error(err);
+    } finally {
+      setLoading(false); // <-- hide loading
     }
   };
 
@@ -78,14 +99,23 @@ const LoginScreen = ({ navigation }: LoginScreenProps) => {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
+        autoCapitalize="none"
         placeholderTextColor="#888"
       />
 
       {error && <Text style={styles.errorText}>{error}</Text>}
       
-      <View style={styles.buttonContainer}>
-        <Button title="Login" onPress={handleLogin}/>
-      </View>
+      <TouchableOpacity 
+        style={styles.button} 
+        onPress={handleLogin}
+        disabled={loading} // disable button while loading
+      >
+        {loading ? (
+          <ActivityIndicator color="#fff" size="small" />
+        ) : (
+          <Text style={styles.buttonText}>Login</Text>
+        )}
+      </TouchableOpacity>
 
       <TouchableOpacity onPress={() => navigation.navigate('Signup')}>
         <Text style={styles.loginText}>Don't have an account? Sign Up</Text>
@@ -102,7 +132,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5'
   },
   title: { 
-    fontSize: 38, 
+    fontSize: 32, 
     fontWeight: 'bold',
     marginBottom: 24, 
     textAlign: 'center',
@@ -119,11 +149,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333'
   },
-  buttonContainer: {
-    marginVertical: 10,
+  button: {
     backgroundColor: '#007AFF',
     borderRadius: 8,
-    paddingVertical: 5,
+    paddingVertical: 14,
+    marginTop: 10,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  buttonText: {
+    color: '#fff',
+    textAlign: 'center',
+    fontSize: 18,
+    fontWeight: '600',
   },
   errorText: { 
     color: '#D8000C', 

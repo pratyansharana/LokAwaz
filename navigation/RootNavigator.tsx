@@ -1,82 +1,108 @@
 import React, { useState, useEffect } from 'react';
+import { ActivityIndicator, View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { onAuthStateChanged, User } from 'firebase/auth';
+import { auth, db } from '../Firebase/firebaseconfig';
 
-// Import your Firebase config and screens
-import { auth } from '../Firebase/firebaseconfig'; // Ensure this path is correct
+// Firestore imports
+import { doc, getDoc, setDoc, serverTimestamp, GeoPoint } from 'firebase/firestore'; 
+import * as Location from 'expo-location'; 
+
+// Screens
 import LoginScreen from '../screens/LoginScreen';
 import SignupScreen from '../screens/SignupScreen';
-import HomeScreen from '../screens/HomeScreen';
+import MainTabs from './MainTabs'; // Bottom tab navigator after login
 
-// Create a stack navigator
 const Stack = createNativeStackNavigator();
 
-/**
- * The main navigator that decides which stack of screens to show based on auth state.
- */
+// --- App (after login & verification) ---
+const AppStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="MainTabs" component={MainTabs} />
+  </Stack.Navigator>
+);
+
+// --- Auth (before login or signup) ---
+const AuthStack = () => (
+  <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Screen name="Login" component={LoginScreen} />
+    <Stack.Screen name="Signup" component={SignupScreen} />
+  </Stack.Navigator>
+);
+
 const RootNavigator = () => {
-  // State to hold the user object from Firebase, or null if not logged in
   const [user, setUser] = useState<User | null>(null);
-  
-  // State to check if the auth state has been loaded
   const [initializing, setInitializing] = useState(true);
 
-  // Effect hook to subscribe to Firebase auth state changes
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (initializing) {
-        setInitializing(false);
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      try {
+        if (currentUser) {
+          // ✅ Only proceed if email is verified
+          if (currentUser.emailVerified) {
+            const userDocRef = doc(db, "users", currentUser.uid);
+            const docSnap = await getDoc(userDocRef);
+
+            if (!docSnap.exists()) {
+              // Ask for location once when creating profile
+              let locationData = null;
+              const { status } = await Location.requestForegroundPermissionsAsync();
+
+              if (status === 'granted') {
+                const location = await Location.getCurrentPositionAsync({});
+                locationData = new GeoPoint(location.coords.latitude, location.coords.longitude);
+              }
+
+              await setDoc(userDocRef, {
+                uid: currentUser.uid,
+                email: currentUser.email,
+                displayName: currentUser.displayName || '',
+                photoURL: currentUser.photoURL || '',
+                provider: currentUser.providerData[0]?.providerId || 'unknown',
+                createdAt: serverTimestamp(),
+                lastKnownLocation: locationData,
+              });
+            }
+
+            setUser(currentUser); // ✅ Verified user logged in
+          } else {
+            // 🚫 Not verified → sign out
+            await auth.signOut();
+            setUser(null);
+          }
+        } else {
+          setUser(null);
+        }
+      } catch (error) {
+        console.error("!!! BIG ERROR inside onAuthStateChanged !!!", error);
+        setUser(null);
+      } finally {
+        if (initializing) setInitializing(false);
       }
     });
 
-    // Cleanup the subscription when the component unmounts
-    return unsubscribe;
-  }, [initializing]);
+    return unsubscribe; // cleanup
+  }, []);
 
-  // While Firebase is checking the auth state, you can show a loading screen
   if (initializing) {
-    // You can return a loading spinner here instead of null
-    return null; 
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
   }
 
   return (
     <NavigationContainer>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {user ? (
-          // User is signed in: Show the main app screens
           <Stack.Screen name="App" component={AppStack} />
         ) : (
-          // No user is signed in: Show the authentication screens
           <Stack.Screen name="Auth" component={AuthStack} />
         )}
       </Stack.Navigator>
     </NavigationContainer>
-  );
-};
-
-/**
- * Stack for screens that are shown when the user is authenticated.
- */
-const AppStack = () => {
-  return (
-    <Stack.Navigator>
-      <Stack.Screen name="Home" component={HomeScreen} />
-      {/* Add other app screens here (e.g., Report Issue, Profile) */}
-    </Stack.Navigator>
-  );
-};
-
-/**
- * Stack for screens that are shown for user authentication.
- */
-const AuthStack = () => {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="Login" component={LoginScreen} />
-      <Stack.Screen name="Signup" component={SignupScreen} />
-    </Stack.Navigator>
   );
 };
 
