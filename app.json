@@ -26,13 +26,25 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
+    },
+    "extra": {
+      "firebaseProjectId": "lokawaz-506ba",
+      "eas": {
+        "projectId": "bee6e42e-87d8-4bec-aad9-979aeecc8f0f"
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-audio"
-    ]
+      "expo-audio",
+      "expo-asset"
+    ],
+    "owner": "pratyansh_rana"
   }
 }

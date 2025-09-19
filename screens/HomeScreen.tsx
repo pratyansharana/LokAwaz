@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   Dimensions,
+  Alert,
 } from "react-native";
 import { signOut } from "firebase/auth";
 import {
@@ -19,12 +20,15 @@ import {
   orderBy,
   limit,
   DocumentData,
+  doc,
+  setDoc,
 } from "firebase/firestore";
 import { auth, db } from "../Firebase/firebaseconfig";
 import Icon from "react-native-vector-icons/MaterialCommunityIcons";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import dayjs from "dayjs";
 import Swiper from "react-native-swiper";
+import messaging from "@react-native-firebase/messaging";
 
 const { width } = Dimensions.get("window");
 
@@ -33,9 +37,7 @@ interface Issue {
   description: string;
   images: string[];
   status: string;
-  createdAt: {
-    seconds: number;
-  };
+  createdAt: { seconds: number };
   location: { latitude: number; longitude: number };
   userId: string;
 }
@@ -53,7 +55,45 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
+  // ---------------- FCM TOKEN ----------------
+  const saveFcmTokenToFirestore = async () => {
+    try {
+      console.log("Starting FCM token upload process...");
+
+      // Request permissions
+      const authStatus = await messaging().requestPermission();
+      const enabled =
+        authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+        authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+      if (!enabled) {
+        console.log("Push notification permission denied");
+        return;
+      }
+
+      // Get the FCM token
+      const fcmToken = await messaging().getToken();
+      console.log("Fetched FCM token:", fcmToken);
+
+      if (auth.currentUser) {
+        await setDoc(
+          doc(db, "users", auth.currentUser.uid),
+          { fcmToken },
+          { merge: true }
+        );
+        console.log("FCM token uploaded successfully to Firestore");
+      } else {
+        console.log("No logged-in user to save FCM token");
+      }
+    } catch (err: any) {
+      console.error("Error uploading FCM token:", err);
+    }
+  };
+
+  // ---------------- FIRESTORE LISTENER ----------------
   useEffect(() => {
+    saveFcmTokenToFirestore();
+
     const issuesQuery = query(
       collection(db, "issues"),
       orderBy("createdAt", "desc"),
@@ -73,6 +113,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
           userId: data.userId || "",
         } as Issue;
       });
+      console.log("Fetched issues from Firestore:", fetchedIssues.length);
       setIssues(fetchedIssues);
       setLoading(false);
       setRefreshing(false);
@@ -84,9 +125,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   const handleSignOut = async () => {
     try {
       await signOut(auth);
-      alert("Signed out successfully");
+      Alert.alert("Signed out successfully");
     } catch (err) {
-      alert("Error signing out");
+      Alert.alert("Error signing out");
     }
   };
 
@@ -96,7 +137,6 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   const renderImages = (images: string[]) => {
     if (images.length === 0) return null;
-
     return (
       <View style={styles.imageContainer}>
         {images.length === 1 ? (
@@ -118,13 +158,9 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
   };
 
   const renderIssueCard = ({ item }: { item: Issue }) => {
-    const formattedDate = dayjs
-      .unix(item.createdAt.seconds)
-      .format("MMM D, YYYY h:mm A");
-
+    const formattedDate = dayjs.unix(item.createdAt.seconds).format("MMM D, YYYY h:mm A");
     return (
       <View style={styles.issueCard}>
-        {/* Header */}
         <View style={styles.issueCardHeader}>
           <Icon name="account-circle" size={40} color="#555" />
           <View style={{ flex: 1, marginLeft: 10 }}>
@@ -132,19 +168,14 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
             <Text style={styles.issueDate}>{formattedDate}</Text>
           </View>
           <View
-            style={[
-              styles.statusBadge,
-              statusColors[item.status] || statusColors["Reported"],
-            ]}
+            style={[styles.statusBadge, statusColors[item.status] || statusColors["Reported"]]}
           >
             <Text style={styles.statusBadgeText}>{item.status}</Text>
           </View>
         </View>
 
-        {/* Images */}
         {renderImages(item.images)}
 
-        {/* Description */}
         {item.description ? (
           <Text style={styles.issueDescription}>{item.description}</Text>
         ) : null}
@@ -154,7 +185,6 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>LokAwaz</Text>
         <TouchableOpacity onPress={handleSignOut} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
@@ -162,7 +192,6 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
         </TouchableOpacity>
       </View>
 
-      {/* Feed */}
       {loading ? (
         <ActivityIndicator size="large" color="#007AFF" style={{ marginTop: 50 }} />
       ) : issues.length === 0 ? (
@@ -178,7 +207,6 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
         />
       )}
 
-      {/* Floating Action Button */}
       <TouchableOpacity
         style={styles.fab}
         onPress={() => navigation.navigate("ReportIssue", { category: "General" })}
@@ -196,10 +224,7 @@ const statusColors: Record<string, any> = {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f2f4f7",
-  },
+  container: { flex: 1, backgroundColor: "#f2f4f7" },
   header: {
     paddingVertical: 15,
     paddingHorizontal: 20,
@@ -209,18 +234,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     elevation: 4,
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#fff",
-    letterSpacing: 1,
-  },
-  noIssuesText: {
-    textAlign: "center",
-    marginTop: 30,
-    fontSize: 16,
-    color: "#888",
-  },
+  headerTitle: { fontSize: 24, fontWeight: "bold", color: "#fff", letterSpacing: 1 },
+  noIssuesText: { textAlign: "center", marginTop: 30, fontSize: 16, color: "#888" },
   issueCard: {
     marginTop: 15,
     marginHorizontal: 15,
@@ -233,63 +248,16 @@ const styles = StyleSheet.create({
     shadowRadius: 6,
     elevation: 3,
   },
-  issueCardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-  },
-  issueUser: {
-    fontWeight: "600",
-    fontSize: 16,
-    color: "#333",
-  },
-  issueDate: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 2,
-  },
-  statusBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 16,
-    alignSelf: "center",
-    justifyContent: "center",
-  },
-  statusBadgeText: {
-    color: "#fff",
-    fontWeight: "700",
-    fontSize: 12,
-  },
-  imageContainer: {
-    width: "100%",
-    height: 250,
-  },
+  issueCardHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 15, paddingVertical: 12 },
+  issueUser: { fontWeight: "600", fontSize: 16, color: "#333" },
+  issueDate: { fontSize: 12, color: "#999", marginTop: 2 },
+  statusBadge: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 16, alignSelf: "center", justifyContent: "center" },
+  statusBadgeText: { color: "#fff", fontWeight: "700", fontSize: 12 },
+  imageContainer: { width: "100%", height: 250 },
   swiper: {},
-  issueImage: {
-    width: "100%",
-    height: 250,
-    resizeMode: "cover",
-  },
-  issueDescription: {
-    paddingHorizontal: 15,
-    paddingVertical: 14,
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#444",
-  },
-  fab: {
-    position: "absolute",
-    bottom: 25,
-    right: 25,
-    backgroundColor: "#007AFF",
-    borderRadius: 30,
-    width: 60,
-    height: 60,
-    justifyContent: "center",
-    alignItems: "center",
-    elevation: 5,
-  },
+  issueImage: { width: "100%", height: 250, resizeMode: "cover" },
+  issueDescription: { paddingHorizontal: 15, paddingVertical: 14, fontSize: 15, lineHeight: 22, color: "#444" },
+  fab: { position: "absolute", bottom: 25, right: 25, backgroundColor: "#007AFF", borderRadius: 30, width: 60, height: 60, justifyContent: "center", alignItems: "center", elevation: 5 },
 });
 
 export default HomeScreen;
