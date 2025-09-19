@@ -9,11 +9,24 @@ const db = admin.firestore();
 
 // Map categories to departments
 const CATEGORY_TO_DEPARTMENT: Record<string, string> = {
-  Pothole: "Roads",
-  Garbage: "Sanitation",
-  Streetlight: "Electrical",
-  Security: "Security",
-  // add more if needed
+    // Original Categories
+    "Pothole": "Roads",
+    "Garbage Dump": "Sanitation",
+    "Street Lighting": "Electrical",
+    "Security": "Security",
+    
+    // Expanded Categories
+    "Public Health & Sanitation": "Sanitation",
+    "Water Supply": "Water Department",
+    "Open Manhole": "Drainage & Sewage",
+    "Traffic Signals Malfunction": "Traffic Police",
+    "Illegal Parking": "Traffic Police",
+    "Waterlogging": "Drainage & Sewage",
+    "Noise Pollution": "Pollution Control",
+    "Animal welfare": "Animal Control",
+    "Road Encroachment": "Municipal Corporation",
+    "Illegal Construction": "Municipal Corporation",
+    "Others": "General Administration",
 };
 
 // --- Helper for sending Expo push notifications ---

@@ -1,12 +1,13 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
+import { MaterialCommunityIcons as Icon } from '@expo/vector-icons';
 
 // Screens
 import HomeScreen from '../screens/HomeScreen';          // main dashboard
 import NearbyScreen from '../screens/NearbyScreen';      // nearby map + posts
 import ReportIssueScreen from '../screens/ReportScreen'; // report form
 import ProfileScreen from '../screens/ProfileScreen';    // profile/logout
+import ReportDetailsScreen from '../screens/ReportDetailsScreen';
 
 const Tab = createBottomTabNavigator();
 
@@ -33,6 +34,7 @@ const MainTabs = () => {
       <Tab.Screen name="Nearby" component={NearbyScreen} />
       <Tab.Screen name="Report" component={ReportIssueScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+  
     </Tab.Navigator>
   );
 };
