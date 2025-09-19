@@ -2,6 +2,7 @@ import * as admin from "firebase-admin";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { getDistance } from "geolib";
 import { Timestamp } from "firebase-admin/firestore";
+import fetch from "node-fetch";
 
 admin.initializeApp();
 const db = admin.firestore();
@@ -15,6 +16,39 @@ const CATEGORY_TO_DEPARTMENT: Record<string, string> = {
   // add more if needed
 };
 
+// --- Helper for sending Expo push notifications ---
+const sendExpoNotification = async (
+  expoPushToken: string,
+  title: string,
+  body: string,
+  data: Record<string, any> = {}
+) => {
+  try {
+    const message = {
+      to: expoPushToken,
+      sound: "default",
+      title,
+      body,
+      data,
+    };
+
+    const res = await fetch("https://exp.host/--/api/v2/push/send", {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(message),
+    });
+
+    const result = await res.json();
+    console.log("📩 Expo push response:", result);
+  } catch (err) {
+    console.error("🔥 Error sending Expo push notification:", err);
+  }
+};
+
+// --- Core assignment logic ---
 export const assignNearestWorkerOnIssueCreate = onDocumentCreated(
   {
     document: "issues/{issueId}",
@@ -104,32 +138,28 @@ export const assignNearestWorkerOnIssueCreate = onDocumentCreated(
       // --- Notifications ---
       const workerSnap = await workerRef.get();
       const workerData = workerSnap.data() as any;
-      const token = workerData?.fcmToken;
+      const workerExpoToken = workerData?.expoPushToken; // your field in Firestore
 
       // Detect if running in emulator
       const isEmulator = !!process.env.FIRESTORE_EMULATOR_HOST;
 
-      if (token) {
-        const message = {
-          token: token,
-          notification: {
+      if (workerExpoToken) {
+        if (isEmulator) {
+          console.log(`[EMULATOR] Would send Expo notification to worker ${nearest.id}`, {
             title: "New Task Assigned",
             body: `You have been assigned to issue ${snap.id}`,
-          },
-          data: {
-            issueId: snap.id,
-            department: department,
-          },
-        };
-
-        if (isEmulator) {
-          console.log(`[EMULATOR] Would send notification to worker ${nearest.id}:`, message);
+            data: { issueId: snap.id, department },
+          });
         } else {
-          await admin.messaging().send(message);
-          console.log(`📩 Notification sent to worker ${nearest.id}`);
+          await sendExpoNotification(
+            workerExpoToken,
+            "New Task Assigned",
+            `You have been assigned to issue ${snap.id}`,
+            { issueId: snap.id, department }
+          );
         }
       } else {
-        console.log("⚠️ Worker has no FCM token:", nearest.id);
+        console.log("⚠️ Worker has no Expo push token:", nearest.id);
       }
 
       // Notify citizen who reported the issue
@@ -137,32 +167,27 @@ export const assignNearestWorkerOnIssueCreate = onDocumentCreated(
         const userRef = db.collection("users").doc(issue.userId);
         const userSnap = await userRef.get();
         const userData = userSnap.data() as any;
-        const userToken = userData?.fcmToken;
+        const userExpoToken = userData?.expoPushToken;
 
-        if (userToken) {
-          const userMessage = {
-            token: userToken,
-            notification: {
+        if (userExpoToken) {
+          if (isEmulator) {
+            console.log(`[EMULATOR] Would send Expo notification to user ${issue.userId}`, {
               title: "Issue Assigned",
               body: `Your issue ${snap.id} has been assigned to a worker.`,
-            },
-            data: {
-              issueId: snap.id,
-              workerId: nearest.id,
-            },
-          };
-
-          if (isEmulator) {
-            console.log(`[EMULATOR] Would send notification to user ${issue.userId}:`, userMessage);
+              data: { issueId: snap.id, workerId: nearest.id },
+            });
           } else {
-            await admin.messaging().send(userMessage);
-            console.log(`📩 Notification sent to user ${issue.userId}`);
+            await sendExpoNotification(
+              userExpoToken,
+              "Issue Assigned",
+              `Your issue ${snap.id} has been assigned to a worker.`,
+              { issueId: snap.id, workerId: nearest.id }
+            );
           }
         } else {
-          console.log("⚠️ User has no FCM token:", issue.userId);
+          console.log("⚠️ User has no Expo push token:", issue.userId);
         }
       }
-
     } catch (err: any) {
       console.error("🔥 Error in assignNearestWorkerOnIssueCreate:", err);
     }
