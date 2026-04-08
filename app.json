@@ -30,7 +30,8 @@
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS"
-      ]
+      ],
+      "package": "com.pratyansh_rana.LokAwaz"
     },
     "extra": {
       "firebaseProjectId": "lokawaz-506ba",
@@ -43,7 +44,17 @@
     },
     "plugins": [
       "expo-audio",
-      "expo-asset"
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Allow LokAwaz to use the camera for automated civic issue detection."
+        }
+      ],
+      "expo-asset",
+      "react-native-vision-camera",
+      "react-native-fast-tflite",
+      "expo-sqlite",
+      "expo-build-properties"
     ],
     "owner": "pratyansh_rana"
   }
