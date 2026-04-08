@@ -27,11 +27,12 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
+      "package": "com.pratyansh_rana.LokAwaz",
       "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.MODIFY_AUDIO_SETTINGS"
-      ],
-      "package": "com.pratyansh_rana.LokAwaz"
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA"
+      ]
     },
     "extra": {
       "firebaseProjectId": "lokawaz-506ba",
@@ -43,18 +44,35 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-audio",
       [
         "react-native-vision-camera",
         {
           "cameraPermissionText": "Allow LokAwaz to use the camera for automated civic issue detection."
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow LokAwaz to use your location to map civic issues while driving."
+        }
+      ],
       "expo-asset",
-      "react-native-vision-camera",
-      "react-native-fast-tflite",
       "expo-sqlite",
-      "expo-build-properties"
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "packagingOptions": {
+              "pickFirst": [
+                "**/libc++_shared.so"
+              ]
+            }
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
     ],
     "owner": "pratyansh_rana"
   }
