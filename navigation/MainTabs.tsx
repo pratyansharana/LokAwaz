@@ -8,6 +8,7 @@ import NearbyScreen from '../screens/NearbyScreen';      // nearby map + posts
 import ReportIssueScreen from '../screens/ReportScreen'; // report form
 import ProfileScreen from '../screens/ProfileScreen';    // profile/logout
 import ReportDetailsScreen from '../screens/ReportDetailsScreen';
+import DashcamScreen from '../screens/Dashcamscreen';  // dashcam screen`
 
 const Tab = createBottomTabNavigator();
 
@@ -34,6 +35,7 @@ const MainTabs = () => {
       <Tab.Screen name="Nearby" component={NearbyScreen} />
       <Tab.Screen name="Report" component={ReportIssueScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen name="Dashcam" component={DashcamScreen} />
   
     </Tab.Navigator>
   );

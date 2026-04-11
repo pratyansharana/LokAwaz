@@ -31,13 +31,15 @@
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+    "android.permission.RECORD_AUDIO"
       ]
     },
     "extra": {
       "firebaseProjectId": "lokawaz-506ba",
       "eas": {
-        "projectId": "bee6e42e-87d8-4bec-aad9-979aeecc8f0f"
+        "projectId": "bee6e42e-87d8-4bec-aad9-979aeecc8f0f",
+        "model":"./assets/pothole.tflite"
       }
     },
     "web": {

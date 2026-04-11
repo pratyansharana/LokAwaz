@@ -58,13 +58,13 @@ interface StatusCounts {
 const GRIEVANCE_CATEGORIES = [
     { title: "Public Health & Sanitation", icon: "medical-bag", key: "Sanitation" },
     { title: "Water Supply", icon: "water-pump", key: "Water" },
-    { title: "Garbage Dump", icon: "Dustbin", key: "Planning" },
+    { title: "Garbage Dump", icon: "trash-can", key: "Planning" },
     { title: "Open Manhole", icon: "circle-outline", key: "Poverty" },
     { title: "Pothole", icon: "road", key: "road" },
     { title: "Street Lighting", icon: "lightbulb-on-outline", key: "Streetlight" },
     { title: "Traffic Signals Malfunction", icon: "traffic-light", key: "Traffic" },
     { title: "Illegal Parking", icon: "car-brake-hold", key: "Parking" },
-    { title: "Waterlogging", icon: "flood", key: "Waterlogging" },
+    { title: "Waterlogging", icon: "water-alert", key: "Waterlogging" },
     { title: "Noise Pollution", icon: "volume-high", key: "Pollution" },
     { title: "Security", icon: "shield-lock-outline", key: "Security" },
     { title: "Animal welfare", icon: "dog-side", key: "AnimalControl" },
@@ -266,7 +266,7 @@ const HomeScreen = ({ navigation }: HomeScreenProps) => {
 
       {/* FAB */}
       <View style={styles.fabContainer}>
-        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate("ReportIssue", { category: "General" })}>
+        <TouchableOpacity style={styles.fab} onPress={() => navigation.navigate("Dashcam", { category: "General" })}>
           <Icon name="robot-outline" size={32} color="#FFF" />
         </TouchableOpacity>
       </View>

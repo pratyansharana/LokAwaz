@@ -3,7 +3,13 @@ module.exports = function(api) {
   return {
     presets: ['babel-preset-expo'],
     plugins: [
-      'react-native-reanimated/plugin', // THIS MUST BE LAST
+      ['module-resolver', {
+        alias: {
+          'react-native-worklets': 'react-native-worklets-core',
+        },
+      }],
+      'react-native-worklets-core/plugin',
+      'react-native-reanimated/plugin', // Must be last
     ],
   };
 };

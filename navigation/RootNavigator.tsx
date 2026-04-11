@@ -25,6 +25,7 @@ import MainTabs from './MainTabs';
 import ReportScreen from '../screens/ReportScreen';
 import ReportDetailsScreen from '../screens/ReportDetailsScreen';
 import NearbyScreen from '../screens/NearbyScreen';
+import DashcamScreen from '../screens/Dashcamscreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -135,6 +136,11 @@ const AppStack = ({ locationName }: { locationName: string }) => (
       name="nearby"
       component={NearbyScreen}
       options={{ title: 'Nearby issues' }}
+    />
+    <Stack.Screen
+      name="Dashcam"
+      component={DashcamScreen}
+      options={{ title: 'Dashcam' }}
     />
   </Stack.Navigator>
 );
